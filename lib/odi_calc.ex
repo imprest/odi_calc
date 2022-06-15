@@ -1,24 +1,25 @@
 defmodule OdiCalc do
-  use Bitwise
+  import Bitwise
+
+  require Record
+  Record.defrecordp(:wx, Record.extract(:wx, from_lib: "wx/include/wx.hrl"))
+  Record.defrecordp(:wxClose, Record.extract(:wxClose, from_lib: "wx/include/wx.hrl"))
+  Record.defrecordp(:wxSize, Record.extract(:wxSize, from_lib: "wx/include/wx.hrl"))
+  Record.defrecordp(:wxCommand, Record.extract(:wxCommand, from_lib: "wx/include/wx.hrl"))
+
   @behaviour :wx_object
+
   @title "OD Interest Calculator"
   @size {400, 400}
+  @btn_file_open 1
+  @text_file 2
 
-  @wxUP 64
-  @wxDOWN 128
-  @wxLEFT 16
-  @wxRIGHT 32
-  @wxALL @wxUP ||| @wxDOWN ||| @wxLEFT ||| @wxRIGHT
-  @wxGROW 8192
-  @wxEXPAND @wxGROW
-  @wxVERTICAL 8
-  @wxHORIZONTAL 4
-
-  @wxID_OK 5100
-  @wxID_CANCEL 5101
-  @wxID_APPLY 5102
-  @wxID_YES 5103
-  @wxID_NO 5104
+  @wxHORIZONTAL :wx_const.wxHORIZONTAL()
+  @wxVERTICAL :wx_const.wxVERTICAL()
+  @wxEXPAND :wx_const.wxEXPAND()
+  @wxALL :wx_const.wxALL()
+  @wxID_OK :wx_const.wxID_OK()
+  @wxID_CANCEL :wx_const.wxID_CANCEL()
 
   @moduledoc """
   Documentation for `OdiCalc`.
@@ -46,54 +47,54 @@ defmodule OdiCalc do
     panel = :wxPanel.new(frame, [])
 
     main_sizer = :wxBoxSizer.new(@wxVERTICAL)
-    sizer = :wxStaticBoxSizer.new(@wxVERTICAL, panel, [{:label, "Input"}])
+    sizer = :wxStaticBoxSizer.new(@wxHORIZONTAL, panel, label: "Input")
 
-    buttons = [:wxButton.new(panel, 1, [{:label, "Select Bank CSV file"}])]
+    btn_file_open = :wxButton.new(panel, @btn_file_open, label: "Select Bank CSV file: ")
+    text_file = :wxTextCtrl.new(panel, @text_file)
+
     dialogs = [{:wxFileDialog, [panel, []]}]
 
-    # Add to sizers
-    fun = fn button ->
-      label = :wxButton.getLabel(button)
-      label = List.to_atom(label)
-      :wxSizer.add(sizer, button, [{:border, 4}, {:flag, @wxALL ||| @wxEXPAND}])
-      :wxButton.connect(button, :command_button_clicked, [{:userData, label}])
-    end
-
-    :wx.foreach(fun, buttons)
-
-    :wxSizer.add(main_sizer, sizer)
+    label = List.to_atom(:wxButton.getLabel(btn_file_open))
+    :wxSizer.add(sizer, btn_file_open, border: 4)
+    :wxButton.connect(btn_file_open, :command_button_clicked, userData: label)
+    :wxSizer.add(sizer, text_file, flag: @wxEXPAND ||| @wxALL)
+    :wxSizer.add(main_sizer, sizer, flag: @wxEXPAND ||| @wxALL)
 
     :wxPanel.setSizer(panel, main_sizer)
 
     :wxFrame.show(frame)
 
-    state = %{panel: panel, dialogs: dialogs}
+    state = %{panel: panel, dialogs: dialogs, file_path: "", text_file: text_file}
     {frame, state}
   end
 
-  def handle_event({:wx, _, _, _, {:wxSize, :size, size, _}}, state = %{panel: panel}) do
+  def handle_event(wx(event: wxSize(size: size)), state = %{panel: panel}) do
     :wxPanel.setSize(panel, size)
+    IO.inspect(state)
     {:noreply, state}
   end
 
-  def handle_event({:wx, _, _, _, {:wxClose, :close_window}}, state) do
-    {:stop, :normal, state}
-  end
+  def handle_event(wx(event: wxClose()), state), do: {:stop, :normal, state}
 
-  def handle_event({:wx, _, _, _, {:wxCommand, :command_button_clicked, [], 0, 0}}, state) do
-    dialog = Kernel.apply(:wxFileDialog, :new, [state.panel, []])
+  def handle_event(
+        wx(id: @btn_file_open, event: wxCommand()),
+        state = %{panel: panel, text_file: text_file}
+      ) do
+    dialog = Kernel.apply(:wxFileDialog, :new, [panel, []])
 
     case :wxFileDialog.showModal(dialog) do
       @wxID_OK ->
-        IO.inspect(:wxFileDialog.getPath(dialog))
+        file_path = :wxFileDialog.getPath(dialog)
+        :wxTextCtrl.setValue(text_file, file_path)
+        {:noreply, %{state | file_path: file_path}}
 
       @wxID_CANCEL ->
         :cancel
+        {:noreply, state}
 
       any ->
         IO.inspect(any)
+        {:noreply, state}
     end
-
-    {:noreply, state}
   end
 end
