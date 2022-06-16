@@ -1,19 +1,20 @@
 defmodule OdiCalc.Calculator do
+  alias NimbleCSV.RFC4180, as: CSV
+
   # in perecentage i.e. 21.5
-  @interest_rate 21
+  @interest_rate 21.0
   # UMB or ABSA
   @bank_type "UMB"
 
   def calc(csv_file, bank_type \\ @bank_type, interest_rate \\ @interest_rate) do
     # parse the file to normalise the data
-    # File.read!("/home/hvaria/Documents/Accounts/ECOBANK/202203.csv")
     data =
       File.read!(csv_file)
-      |> String.split("\n", trim: true)
+      |> CSV.parse_string(skip_headers: true)
       |> Enum.map(fn x ->
         if bank_type === "UMB" do
           # UMB
-          [date, _, value_date, debit, credit, balance] = String.split(x, ",")
+          [date, _, value_date, debit, credit, balance] = x
 
           [
             to_date(date),
@@ -24,7 +25,7 @@ defmodule OdiCalc.Calculator do
           ]
         else
           # ABSA
-          [date, value_date, _desc, _chq, debit, credit, balance] = String.split(x, ",")
+          [date, value_date, _desc, _chq, debit, credit, balance] = x
 
           [d, m, y] =
             date |> String.slice(0, 10) |> String.split("/") |> Enum.map(&String.to_integer(&1))
@@ -57,7 +58,6 @@ defmodule OdiCalc.Calculator do
     last_date = balances |> Enum.reverse() |> Enum.at(0) |> Enum.at(0)
     month = Map.get(last_date, :month)
     days_in_year = if Date.leap_year?(last_date), do: 366, else: 365
-    IO.inspect(Calendar.strftime(last_date, "%b-%Y"), label: "Month")
 
     # Get last month closing balance if you need to create a dummy first day
     last_month_closing_balance =
@@ -80,12 +80,10 @@ defmodule OdiCalc.Calculator do
         :lt -> [[first_date, last_month_closing_balance] | balances]
       end
 
-    # Add days
-    balances = balances |> add_days()
-
     # Calcualte actual bal and interest per day
     balances =
       balances
+      |> add_days()
       |> Enum.map(fn [date, days, bal] ->
         diff = postponed_values(data, date)
         actual = Float.round(bal + diff, 2)
@@ -99,24 +97,26 @@ defmodule OdiCalc.Calculator do
         ]
       end)
 
-    # Format output as csv for easy copy and pasting
-    balances
-    |> Enum.map(fn [date, days, bal, actual, interest] ->
-      IO.puts(
-        Calendar.strftime(date, "%d-%b-%Y") <>
-          "," <>
-          Integer.to_string(days) <>
-          "," <>
-          Float.to_string(bal) <>
-          "," <> Float.to_string(actual) <> ",#{interest_rate}," <> Float.to_string(interest)
-      )
-    end)
+    # Calculate total interest for the month and generate details as csv lines
+    {total_interest, csv_details} =
+      for [date, days, bal, actual, interest] <- balances, reduce: {0.0, []} do
+        {total, list} ->
+          {total + interest,
+           [
+             "#{Calendar.strftime(date, "%d-%b-%Y")},#{Integer.to_string(days)},#{Float.to_string(bal)},#{Float.to_string(actual)},#{interest_rate},#{Float.to_string(interest)}\n"
+             | list
+           ]}
+      end
 
-    # Spit out the interest for the month
-    balances
-    |> Enum.reduce(0.0, fn [_, _, _, _, i], acc -> acc + i end)
-    |> Float.round(2)
-    |> IO.inspect(label: "Interest")
+    # Spit out the interest and details for the month
+    {:ok,
+     List.to_string([
+       "Month: #{Calendar.strftime(last_date, "%b %Y")}\n",
+       "Date,Days,Online Bal,Actual Bal,% p.a.,Interest\n",
+       :lists.reverse(csv_details),
+       "Total Interest: ",
+       Float.to_string(Float.round(total_interest, 2))
+     ])}
   end
 
   def to_date(date) do
@@ -156,17 +156,13 @@ defmodule OdiCalc.Calculator do
   def postponed_values(data, d) do
     range = Date.range(Date.add(d, -5), d)
 
-    data
-    |> Enum.filter(fn [x, _, _, _, _] -> Enum.member?(range, x) end)
-    |> Enum.reduce(0.0, fn [_, value_date, debit, credit, _], acc ->
-      case Date.compare(value_date, d) do
-        :gt ->
-          acc + debit - credit
-
-        _ ->
-          acc
-      end
-    end)
+    for [x, value_date, debit, credit, _] <- data, Enum.member?(range, x), reduce: 0.0 do
+      acc ->
+        case Date.compare(value_date, d) do
+          :gt -> acc + debit - credit
+          _ -> acc
+        end
+    end
   end
 
   def add_days(balances), do: add_days(balances, [])
