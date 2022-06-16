@@ -13,10 +13,7 @@ defmodule OdiCalc.Server do
   end
 
   @impl true
-  def handle_info({:DOWN, ref, :process, pid, _reason}, state) do
-    IO.inspect(ref)
-    IO.inspect(pid)
-    IO.inspect(state)
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
     System.stop(0)
     {:noreply, state}
   end

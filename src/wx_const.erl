@@ -7,5 +7,14 @@ wxHORIZONTAL() -> ?wxHORIZONTAL.
 wxVERTICAL() -> ?wxVERTICAL.
 wxEXPAND() -> ?wxEXPAND.
 wxALL() -> ?wxALL.
+wxRIGHT() -> ?wxRIGHT.
+wxLEFT() -> ?wxLEFT.
+wxTOP() -> ?wxTOP.
+wxBOTTOM() -> ?wxBOTTOM.
+wxALIGN_RIGHT() -> ?wxALIGN_RIGHT.
+wxALIGN_LEFT() -> ?wxALIGN_LEFT.
+wxALIGN_TOP() -> ?wxALIGN_TOP.
+wxALIGN_BOTTOM() -> ?wxALIGN_BOTTOM.
+wxALIGN_CENTER() -> ?wxALIGN_CENTER.
 wxID_OK() -> ?wxID_OK.
 wxID_CANCEL() -> ?wxID_CANCEL.
