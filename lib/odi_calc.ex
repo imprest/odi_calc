@@ -18,8 +18,9 @@ defmodule OdiCalc do
   @size {390, 660}
   @picker_file 1
   @btn_calc 2
-  @text_interest 3
-  @text_result 4
+  @label_interest 3
+  @text_interest 4
+  @text_result 5
 
   @wxHORIZONTAL :wx_const.wxHORIZONTAL()
   @wxVERTICAL :wx_const.wxVERTICAL()
@@ -31,8 +32,8 @@ defmodule OdiCalc do
   @wxBOTTOM :wx_const.wxBOTTOM()
   @wxDEFAULT :wx_const.wxDEFAULT()
   @wxTE_MULTILINE :wx_const.wxTE_MULTILINE()
+  @wxALIGN_CENTER :wx_const.wxALIGN_CENTER()
 
-  # @wxALIGN_CENTER :wx_const.wxALIGN_CENTER()
   # @wxALIGN_BOTTOM :wx_const.wxALIGN_BOTTOM()
   # @wxID_OK :wx_const.wxID_OK()
   # @wxID_CANCEL :wx_const.wxID_CANCEL()
@@ -62,6 +63,7 @@ defmodule OdiCalc do
 
     panel = :wxPanel.new(frame)
 
+    container_sizer = :wxBoxSizer.new(@wxVERTICAL)
     main_sizer = :wxBoxSizer.new(@wxVERTICAL)
     top_sizer = :wxStaticBoxSizer.new(@wxVERTICAL, panel, label: "Select Bank CSV File:")
     opt_sizer = :wxBoxSizer.new(@wxHORIZONTAL)
@@ -72,6 +74,12 @@ defmodule OdiCalc do
     btn_calc = :wxButton.new(panel, @btn_calc, label: "Calculate OD Interest")
     label = List.to_atom(:wxButton.getLabel(btn_calc))
     :wxButton.connect(btn_calc, :command_button_clicked, userData: label)
+    :wxButton.disable(btn_calc)
+
+    label_interest =
+      :wxStaticText.new(panel, @label_interest, " Interest: ",
+        style: @wxALIGN_CENTER ||| @wxBOTTOM
+      )
 
     text_interest = :wxTextCtrl.new(panel, @text_interest)
     :wxTextCtrl.setValue(text_interest, "21.00")
@@ -81,6 +89,7 @@ defmodule OdiCalc do
 
     :wxSizer.add(top_sizer, file_picker, border: 5, flag: @wxLEFT ||| @wxRIGHT ||| @wxTOP)
     :wxSizer.add(opt_sizer, btn_calc, border: 5, flag: @wxRIGHT)
+    :wxSizer.add(opt_sizer, label_interest, border: 7, flag: @wxTOP)
     :wxSizer.add(opt_sizer, text_interest)
     :wxSizer.add(top_sizer, opt_sizer, border: 5, flag: @wxALL)
 
@@ -92,14 +101,23 @@ defmodule OdiCalc do
       flag: @wxTOP ||| @wxLEFT
     )
 
-    :wxSizer.add(main_sizer, 2, 2, proportion: 1, flag: @wxEXPAND)
+    :wxPanel.setSizerAndFit(panel, main_sizer)
 
-    :wxFrame.setSizerAndFit(panel, main_sizer)
+    :wxFrame.setSizer(frame, container_sizer)
+    :wxFrame.layout(frame)
     :wxFrame.center(frame)
-    :wxFrame.createStatusBar(frame)
+    status_bar = :wxFrame.createStatusBar(frame)
     :wxFrame.show(frame)
 
-    state = %{panel: panel, file_path: "", text_result: text_result, text_interest: text_interest}
+    state = %{
+      panel: panel,
+      file_path: "",
+      btn_calc: btn_calc,
+      text_result: text_result,
+      text_interest: text_interest,
+      status_bar: status_bar
+    }
+
     {frame, state}
   end
 
@@ -112,16 +130,33 @@ defmodule OdiCalc do
 
   def handle_event(
         wx(event: wxFileDirPicker(type: :command_filepicker_changed, path: path)),
-        state
+        state = %{btn_calc: btn_calc}
       ) do
+    if Path.extname(path) === ".csv", do: :wxButton.enable(btn_calc)
     {:noreply, %{state | file_path: path}}
   end
 
   def handle_event(
         wx(id: @btn_calc, event: wxCommand()),
-        state = %{text_result: text_result, file_path: file_path, text_interest: text_interest}
+        state = %{
+          text_result: text_result,
+          file_path: file_path,
+          text_interest: text_interest,
+          status_bar: status_bar
+        }
       ) do
-    interest = List.to_float(:wxTextCtrl.getValue(text_interest))
+    interest =
+      try do
+        List.to_float(:wxTextCtrl.getValue(text_interest))
+      rescue
+        _ ->
+          :wxStatusBar.setStatusText(
+            status_bar,
+            "Unable to parse interest value. Using default \"21.0\""
+          )
+
+          21.0
+      end
 
     case OdiCalc.Calculator.calc(file_path, "UMB", interest) do
       {:ok, result} ->

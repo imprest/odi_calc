@@ -16,6 +16,7 @@ wxALIGN_LEFT() -> ?wxALIGN_LEFT.
 wxALIGN_TOP() -> ?wxALIGN_TOP.
 wxALIGN_BOTTOM() -> ?wxALIGN_BOTTOM.
 wxALIGN_CENTER() -> ?wxALIGN_CENTER.
+wxID_ANY() -> ?wxID_ANY.
 wxID_OK() -> ?wxID_OK.
 wxID_CANCEL() -> ?wxID_CANCEL.
 wxDEFAULT() -> ?wxDEFAULT.
