@@ -18,19 +18,20 @@ defmodule OdiCalc do
   @size {390, 660}
   @picker_file 1
   @btn_calc 2
-  @text_result 3
+  @text_interest 3
+  @text_result 4
 
+  @wxHORIZONTAL :wx_const.wxHORIZONTAL()
   @wxVERTICAL :wx_const.wxVERTICAL()
   @wxEXPAND :wx_const.wxEXPAND()
   @wxALL :wx_const.wxALL()
   @wxRIGHT :wx_const.wxRIGHT()
   @wxLEFT :wx_const.wxLEFT()
   @wxTOP :wx_const.wxTOP()
+  @wxBOTTOM :wx_const.wxBOTTOM()
   @wxDEFAULT :wx_const.wxDEFAULT()
   @wxTE_MULTILINE :wx_const.wxTE_MULTILINE()
 
-  # @wxHORIZONTAL :wx_const.wxHORIZONTAL()
-  # @wxBOTTOM :wx_const.wxBOTTOM()
   # @wxALIGN_CENTER :wx_const.wxALIGN_CENTER()
   # @wxALIGN_BOTTOM :wx_const.wxALIGN_BOTTOM()
   # @wxID_OK :wx_const.wxID_OK()
@@ -63,6 +64,7 @@ defmodule OdiCalc do
 
     main_sizer = :wxBoxSizer.new(@wxVERTICAL)
     top_sizer = :wxStaticBoxSizer.new(@wxVERTICAL, panel, label: "Select Bank CSV File:")
+    opt_sizer = :wxBoxSizer.new(@wxHORIZONTAL)
 
     file_picker = :wxFilePickerCtrl.new(panel, @picker_file, size: {370, 30})
     :wxFilePickerCtrl.connect(file_picker, :command_filepicker_changed)
@@ -71,11 +73,16 @@ defmodule OdiCalc do
     label = List.to_atom(:wxButton.getLabel(btn_calc))
     :wxButton.connect(btn_calc, :command_button_clicked, userData: label)
 
+    text_interest = :wxTextCtrl.new(panel, @text_interest)
+    :wxTextCtrl.setValue(text_interest, "21.00")
+
     text_result =
       :wxTextCtrl.new(panel, @text_result, size: {380, 450}, style: @wxDEFAULT ||| @wxTE_MULTILINE)
 
     :wxSizer.add(top_sizer, file_picker, border: 5, flag: @wxLEFT ||| @wxRIGHT ||| @wxTOP)
-    :wxSizer.add(top_sizer, btn_calc, border: 5, flag: @wxALL)
+    :wxSizer.add(opt_sizer, btn_calc, border: 5, flag: @wxRIGHT)
+    :wxSizer.add(opt_sizer, text_interest)
+    :wxSizer.add(top_sizer, opt_sizer, border: 5, flag: @wxALL)
 
     :wxSizer.add(main_sizer, top_sizer, flag: @wxRIGHT ||| @wxLEFT, border: 5)
 
@@ -92,7 +99,7 @@ defmodule OdiCalc do
     :wxFrame.createStatusBar(frame)
     :wxFrame.show(frame)
 
-    state = %{panel: panel, file_path: "", text_result: text_result}
+    state = %{panel: panel, file_path: "", text_result: text_result, text_interest: text_interest}
     {frame, state}
   end
 
@@ -112,9 +119,11 @@ defmodule OdiCalc do
 
   def handle_event(
         wx(id: @btn_calc, event: wxCommand()),
-        state = %{text_result: text_result, file_path: file_path}
+        state = %{text_result: text_result, file_path: file_path, text_interest: text_interest}
       ) do
-    case OdiCalc.Calculator.calc(file_path) do
+    interest = List.to_float(:wxTextCtrl.getValue(text_interest))
+
+    case OdiCalc.Calculator.calc(file_path, "UMB", interest) do
       {:ok, result} ->
         :wxTextCtrl.setValue(text_result, result)
         {:noreply, state}
