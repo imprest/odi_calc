@@ -132,7 +132,12 @@ defmodule OdiCalc do
         wx(event: wxFileDirPicker(type: :command_filepicker_changed, path: path)),
         state = %{btn_calc: btn_calc}
       ) do
-    if Path.extname(path) === ".csv", do: :wxButton.enable(btn_calc)
+    if Path.extname(path) === ".csv" do
+      :wxButton.enable(btn_calc)
+    else
+      :wxButton.disable(btn_calc)
+    end
+
     {:noreply, %{state | file_path: path}}
   end
 
