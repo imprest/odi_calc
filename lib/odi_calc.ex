@@ -1,5 +1,6 @@
 defmodule OdiCalc do
   import Bitwise
+  import :wx_const
 
   require Record
   Record.defrecordp(:wx, Record.extract(:wx, from_lib: "wx/include/wx.hrl"))
@@ -15,28 +16,12 @@ defmodule OdiCalc do
   @behaviour :wx_object
 
   @title "OD Interest Calculator"
-  @size {390, 660}
+  @size {390, 620}
   @picker_file 1
   @btn_calc 2
   @label_interest 3
   @text_interest 4
   @text_result 5
-
-  @wxHORIZONTAL :wx_const.wxHORIZONTAL()
-  @wxVERTICAL :wx_const.wxVERTICAL()
-  @wxEXPAND :wx_const.wxEXPAND()
-  @wxALL :wx_const.wxALL()
-  @wxRIGHT :wx_const.wxRIGHT()
-  @wxLEFT :wx_const.wxLEFT()
-  @wxTOP :wx_const.wxTOP()
-  @wxBOTTOM :wx_const.wxBOTTOM()
-  @wxDEFAULT :wx_const.wxDEFAULT()
-  @wxTE_MULTILINE :wx_const.wxTE_MULTILINE()
-  @wxALIGN_CENTER :wx_const.wxALIGN_CENTER()
-
-  # @wxALIGN_BOTTOM :wx_const.wxALIGN_BOTTOM()
-  # @wxID_OK :wx_const.wxID_OK()
-  # @wxID_CANCEL :wx_const.wxID_CANCEL()
 
   @moduledoc """
   Documentation for `OdiCalc`.
@@ -57,53 +42,54 @@ defmodule OdiCalc do
 
   def init(_args \\ []) do
     wx = :wx.new()
-    frame = :wxFrame.new(wx, -1, @title, size: @size)
+    frame = :wxFrame.new(wx, wxID_ANY(), @title, size: @size)
     :wxFrame.connect(frame, :size)
     :wxFrame.connect(frame, :close_window)
 
     panel = :wxPanel.new(frame)
 
-    container_sizer = :wxBoxSizer.new(@wxVERTICAL)
-    main_sizer = :wxBoxSizer.new(@wxVERTICAL)
-    top_sizer = :wxStaticBoxSizer.new(@wxVERTICAL, panel, label: "Select Bank CSV File:")
-    opt_sizer = :wxBoxSizer.new(@wxHORIZONTAL)
+    container_sizer = :wxBoxSizer.new(wxVERTICAL())
+    main_sizer = :wxBoxSizer.new(wxVERTICAL())
+    top_sizer = :wxStaticBoxSizer.new(wxVERTICAL(), panel, label: "Select Bank CSV File:")
+    opt_sizer = :wxBoxSizer.new(wxHORIZONTAL())
 
     file_picker = :wxFilePickerCtrl.new(panel, @picker_file, size: {370, 30})
     :wxFilePickerCtrl.connect(file_picker, :command_filepicker_changed)
 
-    btn_calc = :wxButton.new(panel, @btn_calc, label: "Calculate OD Interest")
+    btn_calc = :wxButton.new(panel, @btn_calc, label: "&Calculate OD Interest")
     label = List.to_atom(:wxButton.getLabel(btn_calc))
     :wxButton.connect(btn_calc, :command_button_clicked, userData: label)
     :wxButton.disable(btn_calc)
 
     label_interest =
-      :wxStaticText.new(panel, @label_interest, " Interest: ",
-        style: @wxALIGN_CENTER ||| @wxBOTTOM
+      :wxStaticText.new(panel, @label_interest, " &Interest: ",
+        style: wxALIGN_CENTER() ||| wxBOTTOM()
       )
 
     text_interest = :wxTextCtrl.new(panel, @text_interest)
     :wxTextCtrl.setValue(text_interest, "21.00")
 
     text_result =
-      :wxTextCtrl.new(panel, @text_result, size: {380, 450}, style: @wxDEFAULT ||| @wxTE_MULTILINE)
+      :wxTextCtrl.new(panel, @text_result,
+        size: {380, 460},
+        style: wxDEFAULT() ||| wxTE_MULTILINE()
+      )
 
-    :wxSizer.add(top_sizer, file_picker, border: 5, flag: @wxLEFT ||| @wxRIGHT ||| @wxTOP)
-    :wxSizer.add(opt_sizer, btn_calc, border: 5, flag: @wxRIGHT)
-    :wxSizer.add(opt_sizer, label_interest, border: 7, flag: @wxTOP)
-    :wxSizer.add(opt_sizer, text_interest)
-    :wxSizer.add(top_sizer, opt_sizer, border: 5, flag: @wxALL)
-
-    :wxSizer.add(main_sizer, top_sizer, flag: @wxRIGHT ||| @wxLEFT, border: 5)
-
-    :wxSizer.add(main_sizer, text_result,
+    :wxSizer.add(top_sizer, file_picker,
       border: 5,
-      proportion: 4,
-      flag: @wxTOP ||| @wxLEFT
+      flag: wxLEFT() ||| wxRIGHT() ||| wxTOP() ||| wxEXPAND()
     )
 
-    :wxPanel.setSizerAndFit(panel, main_sizer)
+    :wxSizer.add(opt_sizer, btn_calc, border: 5, flag: wxRIGHT())
+    :wxSizer.add(opt_sizer, label_interest, border: 7, flag: wxTOP())
+    :wxSizer.add(opt_sizer, text_interest)
+    :wxSizer.add(top_sizer, opt_sizer, border: 5, flag: wxALL())
+    :wxSizer.add(main_sizer, top_sizer, flag: wxEXPAND())
+    :wxSizer.add(main_sizer, text_result, proportion: 2, border: 5, flag: wxTOP() ||| wxEXPAND())
+    :wxSizer.add(container_sizer, main_sizer, border: 5, flag: wxALL() ||| wxEXPAND())
 
-    :wxFrame.setSizer(frame, container_sizer)
+    :wxPanel.setSizerAndFit(panel, container_sizer)
+    # :wxFrame.setSizer(frame, container_sizer)
     :wxFrame.layout(frame)
     :wxFrame.center(frame)
     status_bar = :wxFrame.createStatusBar(frame)
@@ -168,8 +154,9 @@ defmodule OdiCalc do
         :wxTextCtrl.setValue(text_result, result)
         {:noreply, state}
 
-      _ ->
-        # TODO: error occurred, Display an error in statusBar
+      err ->
+        IO.inspect(err)
+        :wxStatusBar.setStatusText(status_bar, "Error occurred.")
         {:noreply, state}
     end
   end
