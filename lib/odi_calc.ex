@@ -16,7 +16,7 @@ defmodule OdiCalc do
   @behaviour :wx_object
 
   @title "OD Interest Calculator"
-  @size {390, 620}
+  @size {390, 630}
   @picker_file 1
   @btn_calc 2
   @label_interest 3
@@ -67,11 +67,11 @@ defmodule OdiCalc do
       )
 
     text_interest = :wxTextCtrl.new(panel, @text_interest)
-    :wxTextCtrl.setValue(text_interest, "21.00")
+    :wxTextCtrl.setValue(text_interest, "30.00")
 
     text_result =
       :wxTextCtrl.new(panel, @text_result,
-        size: {380, 460},
+        size: {380, 500},
         style: wxDEFAULT() ||| wxTE_MULTILINE()
       )
 
@@ -143,20 +143,29 @@ defmodule OdiCalc do
         _ ->
           :wxStatusBar.setStatusText(
             status_bar,
-            "Unable to parse interest value. Using default \"21.0\""
+            "Unable to parse interest value. Using default \"30.0\""
           )
 
-          21.0
+          30.0
       end
 
-    case OdiCalc.Calculator.calc(file_path, "UMB", interest) do
-      {:ok, result} ->
-        :wxTextCtrl.setValue(text_result, result)
-        {:noreply, state}
+    bank_dir = Path.dirname(file_path) |> Path.basename()
 
-      err ->
-        IO.inspect(err)
-        :wxStatusBar.setStatusText(status_bar, "Error occurred.")
+    cond do
+      bank_dir in ["UMB", "ABSA", "ECOBANK"] ->
+        case OdiCalc.Calculator.calc(file_path, bank_dir, interest) do
+          {:ok, result} ->
+            :wxTextCtrl.setValue(text_result, result)
+            {:noreply, state}
+
+          err ->
+            IO.inspect(err)
+            :wxStatusBar.setStatusText(status_bar, "Error occurred.")
+            {:noreply, state}
+        end
+
+      true ->
+        :wxStatusBar.setStatusText(status_bar, "Unknown Bank Dir: #{bank_dir}")
         {:noreply, state}
     end
   end

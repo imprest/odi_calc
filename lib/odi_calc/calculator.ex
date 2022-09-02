@@ -12,37 +12,62 @@ defmodule OdiCalc.Calculator do
       File.read!(csv_file)
       |> CSV.parse_string(skip_headers: true)
       |> Enum.map(fn x ->
-        if bank_type === "UMB" do
-          # UMB
-          [date, _, value_date, debit, credit, balance] = x
+        case bank_type do
+          "UMB" ->
+            [date, _, value_date, debit, credit, balance] = x
 
-          [
-            to_date(date),
-            to_date(value_date),
-            to_float(debit),
-            to_float(credit),
-            to_float(balance)
-          ]
-        else
-          # ABSA
-          [date, value_date, _desc, _chq, debit, credit, balance] = x
+            [
+              to_date(date),
+              to_date(value_date),
+              to_float(debit),
+              to_float(credit),
+              to_float(balance)
+            ]
 
-          [d, m, y] =
-            date |> String.slice(0, 10) |> String.split("/") |> Enum.map(&String.to_integer(&1))
+          "ABSA" ->
+            [date, value_date, _desc, _customer_ref, _chq, debit, credit, balance] = x
 
-          [d1, m1, y1] =
-            value_date
-            |> String.slice(0, 10)
-            |> String.split("/")
-            |> Enum.map(&String.to_integer(&1))
+            [d, m, y] =
+              date |> String.slice(0, 10) |> String.split("/") |> Enum.map(&String.to_integer(&1))
 
-          [
-            Date.new!(y, m, d),
-            Date.new!(y1, m1, d1),
-            to_float(debit),
-            to_float(credit),
-            to_float(balance)
-          ]
+            [d1, m1, y1] =
+              value_date
+              |> String.slice(0, 10)
+              |> String.split("/")
+              |> Enum.map(&String.to_integer(&1))
+
+            [
+              Date.new!(y, m, d),
+              Date.new!(y1, m1, d1),
+              to_float(debit),
+              to_float(credit),
+              to_float(balance)
+            ]
+
+          "ECOBANK" ->
+            [date, value_date, _tx_code, _desc, debit, credit, balance] = x
+            [d, m, y] = String.split(date, " ")
+            [d1, m1, y1] = String.split(value_date, " ")
+
+            {deb, cred} =
+              case {debit, credit} do
+                {debit, _credit} when debit < 0 ->
+                  [0.0, :erlang.abs(debit)]
+
+                {_debit, credit} when credit < 0 ->
+                  [:erlang.abs(credit), 0.0]
+
+                _ ->
+                  {debit, credit}
+              end
+
+            [
+              Date.new!(String.to_integer(y), short_month_to_num(m), String.to_integer(d)),
+              Date.new!(String.to_integer(y1), short_month_to_num(m1), String.to_integer(d1)),
+              to_float(deb),
+              to_float(cred),
+              to_float(balance)
+            ]
         end
       end)
 
@@ -114,7 +139,7 @@ defmodule OdiCalc.Calculator do
        "Month: #{Calendar.strftime(last_date, "%b %Y")}\n",
        "Date,Days,Online Bal,Actual Bal,% p.a.,Interest\n",
        :lists.reverse(csv_details),
-       "Total Interest: ",
+       "Total #{bank_type} Interest: ",
        Float.to_string(Float.round(total_interest, 2))
      ])}
   end
