@@ -145,7 +145,12 @@ defmodule OdiCalc.Calculator do
   end
 
   def to_date(date) do
-    [d, m, y] = String.split(date, " ")
+    [d, m, y] =
+      if String.contains?(date, "-") do
+        String.split(date, "-")
+      else
+        String.split(date, " ")
+      end
 
     if String.length(y) === 4 do
       Date.new!(String.to_integer(y), short_month_to_num(m), String.to_integer(d))
