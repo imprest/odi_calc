@@ -46,8 +46,6 @@ defmodule OdiCalc.Calculator do
 
           "ECOBANK" ->
             [date, value_date, _tx_code, _desc, debit, credit, balance] = x
-            [d, m, y] = String.split(date, " ")
-            [d1, m1, y1] = String.split(value_date, " ")
 
             {deb, cred} =
               case {debit, credit} do
@@ -62,8 +60,8 @@ defmodule OdiCalc.Calculator do
               end
 
             [
-              Date.new!(String.to_integer(y), short_month_to_num(m), String.to_integer(d)),
-              Date.new!(String.to_integer(y1), short_month_to_num(m1), String.to_integer(d1)),
+              to_date(date),
+              to_date(value_date),
               to_float(deb),
               to_float(cred),
               to_float(balance)
@@ -146,8 +144,12 @@ defmodule OdiCalc.Calculator do
 
   def to_date(date) do
     [d, m, y] =
-      if String.contains?(date, "-") do
-        String.split(date, "-")
+      if String.contains?(date, ["-", "/"]) do
+        if String.contains?(date, "-") do
+          String.split(date, "-")
+        else
+          String.split(date, "/")
+        end
       else
         String.split(date, " ")
       end
